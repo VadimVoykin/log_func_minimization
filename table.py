@@ -11,15 +11,24 @@ import itertools as it
 
 class Table:
 
+    __debug_mode__ = False
     __reduction_symbol__: str = "*"
 
-    def __init__(self, obl_imp_list: list[str], sup_imp_list: list[str] = None):
+    def __init__(self, obl_imp_list: list[str],
+                 sup_imp_list: list[str] = None,
+                 debug_mode: bool = False):
+
         Implicant.set_reduction_symbol(self.__reduction_symbol__)
+        __debug_mode__ = debug_mode
+
         if sup_imp_list is None:
             sup_imp_list = []
         self.imp_table = [{}]
         self.original_imps = {Implicant(imp) for imp in obl_imp_list}
         self.reduced_imps = set()
+        self.core_imps = set()
+        self.coverage_imps = set()
+
         imp_length = -1
         for imp in it.chain(obl_imp_list, sup_imp_list):
             if imp_length == -1:
@@ -28,7 +37,6 @@ class Table:
                 raise DifferentLengthException(
                     "Input implicants are different length.")
             self.add_implicant(Implicant(imp))
-        self.imp_length = imp_length  # length of implicants
         self.imp_padding = imp_length  # padding for implicants
 
     def set_imp_table(self, imp_table):
@@ -60,14 +68,15 @@ class Table:
             key_val = list(self.imp_table[column].keys())
             key_val.sort()
             last_index = len(key_val) - 1
-            print(key_val)
             for index in range(last_index):
                 curr_key = key_val[index]
                 next_key = key_val[index + 1]
                 for imp1 in self.imp_table[column][curr_key]:
                     for imp2 in self.imp_table[column][next_key]:
+                        if self.__debug_mode__:
+                            print(f"Compare: {imp1.get_implicant()} "
+                                  f"{imp2.get_implicant()}")
                         new_imp = None
-                        print(f"Compare: {imp1.get_implicant()} {imp2.get_implicant()}")
                         if imp1.get_implicant() != imp2.get_implicant():
                             new_imp = imp1.reduce(imp2)
                         if new_imp is not None:
@@ -77,6 +86,9 @@ class Table:
             for key, imps in self.imp_table[column].items():
                 for imp1 in imps:
                     for imp2 in imps:
+                        if self.__debug_mode__:
+                            print(f"Compare: {imp1.get_implicant()} "
+                                  f"{imp2.get_implicant()}")
                         new_imp = imp1.reduce(imp2)
                         if new_imp is not None:
                             self.add_implicant(new_imp)
@@ -86,13 +98,13 @@ class Table:
     def reduce(self) -> None:
         """Form table of implicants. Sort implicants
            by degree."""
-
+        if self.__debug_mode__:
+            print(">>Executing reduction")
         column = 0
         flag = True
         while flag:
             flag = self.process_column(column)
             column += 1
-        print(self.imp_table)
 
     def consume_for_implicant(self, imp: Implicant) -> None:
         """Mark all implicants, that can be consumed by
@@ -102,7 +114,9 @@ class Table:
         for index in range(degree):
             for val in self.imp_table[index].values():
                 for curr_imp in val:
-                    print(f"Compare if {imp} consumes {curr_imp}")
+                    if self.__debug_mode__:
+                        print(f"Compare if {imp} consumes"
+                              f" {curr_imp}")
                     if imp.consumes(curr_imp) and \
                             not curr_imp.is_consumed():
                         curr_imp.consume()
@@ -110,13 +124,15 @@ class Table:
     def consume(self) -> None:
         """Marks all implicants that can be consumed by implicant
            of higher degree as consumed."""
-        print(">>Executing method 'consume'")
+        if self.__debug_mode__:
+            print(">>Executing consumption")
         table_length = len(self.imp_table)
         for index in range(table_length):
             column = self.imp_table[table_length - index - 1]
             for val in column.values():
                 for imp in val:
-                    print(f"Check {imp}")
+                    if self.__debug_mode__:
+                        print()
                     if not imp.is_consumed():
                         self.consume_for_implicant(imp)
                         self.reduced_imps.add(imp)
@@ -124,8 +140,12 @@ class Table:
     def cover(self) -> None:
         """Finds minimal cover of original implicants by
            prime implicants, that were not consumed."""
-        original_imps = self.original_imps.copy()
-        reduced_imps = self.reduced_imps.copy()
+        if self.__debug_mode__:
+            print(">>Find Coverage")
+        # Object attributes and local variables are
+        # the same object, they will be modified.
+        original_imps = self.original_imps
+        reduced_imps = self.reduced_imps
         core_imps = set()
         # Find core implicants. Raise exception if
         # detected implicant, that can not be covered
@@ -133,7 +153,9 @@ class Table:
         for original_imp in original_imps:
             temp_core_imps = {imp for imp in reduced_imps
                               if imp.consumes(original_imp)}
-            print(f"{original_imp}: {len(temp_core_imps)}")
+            if self.__debug_mode__:
+                print(f"{original_imp} covered by "
+                      f"{len(temp_core_imps)} implicants")
             if len(temp_core_imps) == 1:
                 core_imps = core_imps.union(temp_core_imps)
             elif len(temp_core_imps) == 0:
@@ -151,11 +173,8 @@ class Table:
         # uncovered by 'core_imps' implicants.
         best_coverage = self.full_handle(
             original_imps, reduced_imps)
-        # Print some info
-        print(f"Core imps\n{core_imps}")
-        print(f"Reduced imps\n{reduced_imps}")
-        print(f"Best coverage\n{best_coverage}")
-        print(f"Imps to cover\n{original_imps}")
+        self.core_imps = core_imps
+        self.coverage_imps = best_coverage
 
     @staticmethod
     def full_handle(original_imps, reduced_imps):
@@ -222,7 +241,7 @@ class Table:
                 "Expected object of type str of Implicant.")
         result[row].append(sequence)
 
-    def visualize_table_of_reduction(self) -> str:
+    def visualize_reduction(self) -> str:
         """Return str representation of current class
            member imp_table in 'sql' format."""
         result = []
@@ -246,5 +265,21 @@ class Table:
         content = ["|" + "|".join(row) + "|\n" for row in result]
         return top_border + "".join(content) + top_border
 
-    def visualize_table_of_coverage(self):
-        return str(self.reduced_imps) + "\n"
+    @staticmethod
+    def str_repr(imp_set):
+        result = ' '.join({str(imp) for imp in imp_set})
+        if len(result) == 0:
+            result = "Empty list"
+        return result
+
+    def visualize_coverage(self):
+        result = ""
+        result += f"Core imps\n   " \
+                  f"{Table.str_repr(self.core_imps)}\n"
+        result += f"Reduced imps\n   " \
+                  f"{Table.str_repr(self.reduced_imps)}\n"
+        result += f"Imps to cover\n   " \
+                  f"{Table.str_repr(self.original_imps)}\n"
+        result += f"Best coverage\n   " \
+                  f"{Table.str_repr(self.coverage_imps)}"
+        return result

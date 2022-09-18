@@ -71,7 +71,8 @@ class Implicant:
     def reduce(self, imp):
         """Reduces two implicant itself and given.
            If reduction is possible returns reduced implicant
-           of Implicant Object else None type object."""
+           of Implicant Object else None type object. If implicants
+           are identical, return None."""
 
         if self.get_length() != imp.get_length():
             raise DifferentLengthException(
