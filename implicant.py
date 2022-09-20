@@ -26,11 +26,6 @@ class Implicant:
 
     def get_implicant(self) -> str:
         """Returns string representation of implicant."""
-        if self.consumed:
-            implicant = ""
-            for i in self.__implicant__:
-                implicant += i + "\u0336"
-            return implicant
         return self.__implicant__
 
     def get_length(self) -> int:

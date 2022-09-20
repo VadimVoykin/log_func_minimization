@@ -37,7 +37,7 @@ class Table:
                 raise DifferentLengthException(
                     "Input implicants are different length.")
             self.add_implicant(Implicant(imp))
-        self.imp_padding = imp_length  # padding for implicants
+        self.imp_padding = imp_length + 1  # padding for implicants
 
     def set_imp_table(self, imp_table):
         """Method created for testing process."""
@@ -51,7 +51,7 @@ class Table:
         if degree == 0:
             key = str(imp_str.count("1"))
         else:
-            key = re.sub('[01]', "-", imp_str)
+            key = re.sub('[01]', "_", imp_str)
         # If not enough columns in 'imp_table',
         # add missing one. If element with key
         # 'key' does not exist, add one.
@@ -180,6 +180,8 @@ class Table:
     def full_handle(original_imps, reduced_imps):
         """Find minimal coverage using griddy algorith."""
 
+        if len(original_imps) == 0:
+            return set()
         imps_num = 1
         comb_coefficient = float("inf")
         best_comb = set()
@@ -187,10 +189,9 @@ class Table:
             for comb in it.combinations(reduced_imps, length):
                 params = Table.coverage_coefficients(
                     original_imps, comb)
-                temp_comb_coefficient = params[0] / params[1]
                 if params[0] > imps_num or \
                    (params[0] == imps_num and
-                   temp_comb_coefficient < comb_coefficient):
+                   params[1] > comb_coefficient):
                     best_comb = comb
                     imps_num = params[0]
                     comb_coefficient = params[1]
@@ -211,6 +212,7 @@ class Table:
                                  if curr_imp.consumes(imp)}
             covered_imps = covered_imps.union(temp_covered_imps)
             comb_coefficient += imp_coefficient
+        comb_coefficient = len(covered_imps) / comb_coefficient
         return len(covered_imps), comb_coefficient
 
     def add_imp(self, result, element: Implicant | str,
@@ -233,12 +235,15 @@ class Table:
         # Add given implicant or str to table.
         if isinstance(element, Implicant):
             sequence = element.get_implicant()
+            if element.is_consumed():
+                sequence = "-" + sequence
         elif isinstance(element, str):
             sequence = element
-            sequence = sequence.center(self.imp_padding, "-")
+            sequence = sequence.center(self.imp_padding, " ")
         else:
             raise TypeError(
                 "Expected object of type str of Implicant.")
+        sequence = f"{sequence:>{self.imp_padding}}"
         result[row].append(sequence)
 
     def visualize_reduction(self) -> str:
