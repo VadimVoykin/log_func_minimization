@@ -1,5 +1,8 @@
 from errors import DifferentLengthException
 from errors import ShortImplicantException
+from errors import NotImplicantException
+
+import re
 
 
 class Implicant:
@@ -8,8 +11,16 @@ class Implicant:
 
     def __init__(self, implicant):
         """If implicant length less, than 3,
-           returns ShortImplicantException."""
+           returns ShortImplicantException.
+           If string 'implicant' contain symbol
+           different form '0','1' or reduction symbol,
+           returns NotImplicantException."""
 
+        pattern = f"[^01{self.__reduction_symbol__}]"
+        if re.search(pattern, implicant) is not None:
+            print(implicant)
+            raise NotImplicantException(
+                "Invalid string, impossible to create implicant.")
         if len(implicant) < 3:
             raise ShortImplicantException(
                 "Implicant length less than 3.")
